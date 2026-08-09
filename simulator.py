@@ -1,4 +1,5 @@
 import math
+from collections.abc import Callable
 from typing import cast
 
 import matplotlib.pyplot as plt
@@ -17,6 +18,22 @@ def x_from_y_equilibrium(y: float | np.ndarray, alpha: float) -> float | np.ndar
 
 def get_float(prompt: str) -> float:
     return float(input(prompt).strip())
+
+
+def prompt_float_with_validation(prompt: str, validator: Callable[[float], str | None]) -> float:
+    while True:
+        raw_value = input(prompt).strip()
+        try:
+            value = float(raw_value)
+        except ValueError:
+            print(f"Invalid input '{raw_value}'. Please enter a numeric value.")
+            continue
+
+        error_message = validator(value)
+        if error_message is None:
+            return value
+
+        print(f"Invalid value: {error_message}")
 
 
 def rectifying_line(x: float | np.ndarray, reflux_ratio: float, x_distillate: float) -> float | np.ndarray:
@@ -107,11 +124,28 @@ def minimum_reflux_ratio_with_q(alpha: float, z_feed: float, x_distillate: float
     # Minimum reflux is defined by the rectifying line through (xD, xD) and the feed pinch point.
     x_pinch, y_pinch = feed_pinch_point(alpha, z_feed, q_value)
     r_min_slope = (y_pinch - x_distillate) / (x_pinch - x_distillate)
-    if not 0.0 < r_min_slope < 1.0:
+    if not 0.0 <= r_min_slope < 1.0:
         raise ValueError(
-            "The selected feed condition does not give a physically valid positive minimum reflux ratio."
+            "The selected feed condition does not give a physically valid nonnegative minimum reflux ratio."
         )
     return r_min_slope / (1.0 - r_min_slope)
+
+
+def maximum_q_for_nonnegative_rmin(alpha: float, z_feed: float, x_distillate: float) -> float:
+    # At Rmin = 0, the pinch point lies where y_eq = xD; the resulting feed-line slope defines q_max.
+    x_at_y_equals_xd = cast(float, x_from_y_equilibrium(x_distillate, alpha))
+
+    if math.isclose(x_at_y_equals_xd, z_feed, abs_tol=1e-12):
+        return 1.0
+
+    feed_line_slope = (x_distillate - z_feed) / (x_at_y_equals_xd - z_feed)
+    if math.isclose(feed_line_slope, 1.0, abs_tol=1e-12):
+        raise ValueError("Could not determine a finite q limit for this set of compositions.")
+
+    q_max = feed_line_slope / (feed_line_slope - 1.0)
+    if not math.isfinite(q_max):
+        raise ValueError("Could not determine a finite q limit for this set of compositions.")
+    return q_max
 
 
 def feed_line_intersection(
@@ -267,40 +301,84 @@ def main():
     print("McCabe–Thiele Binary Distillation Stage Estimator")
     print("This program estimates the number of theoretical stages for a binary distillation column.")
     print("Enter all compositions as mole fractions between 0 and 1.")
-    # User inputs are all mole fractions except the reflux ratio.
-    alpha = get_float("Relative volatility of the light key over the heavy key, alpha: ")
+    # User inputs are all mole fractions except q and reflux ratio.
+    alpha = prompt_float_with_validation(
+        "Relative volatility of the light key over the heavy key, alpha (must be finite and greater than 1): ",
+        lambda value: None if math.isfinite(value) and value > 1.0 else "alpha must be finite and greater than 1.",
+    )
+
     # z_feed: feed composition, or the mole fraction of the more volatile component in the feed.
-    z_feed = get_float("Feed composition, zF, or feed mole fraction of the light key: ")
+    z_feed = prompt_float_with_validation(
+        "Feed composition, zF, or feed mole fraction of the light key (must be between 0 and 1): ",
+        lambda value: None if 0.0 < value < 1.0 else "zF must be between 0 and 1.",
+    )
+
     # x_distillate: desired distillate composition, usually the light-key purity at the top product.
-    x_distillate = get_float("Distillate composition, xD, or desired top-product mole fraction of the light key: ")
+    x_distillate = prompt_float_with_validation(
+        f"Distillate composition, xD, or desired top-product mole fraction of the light key (must be greater than zF [{z_feed:.4f}] and less than 1): ",
+        lambda value: (
+            None
+            if 0.0 < value < 1.0 and value > z_feed
+            else f"xD must be between zF ({z_feed:.4f}) and 1."
+        ),
+    )
+
     # x_bottoms: desired bottoms composition, usually the light-key mole fraction left in the bottoms.
-    x_bottoms = get_float("Bottoms composition, xB, or light-key mole fraction remaining in the bottoms: ")
-    q_value = get_float("Feed thermal condition, q (1 = saturated liquid): ")
+    x_bottoms = prompt_float_with_validation(
+        f"Bottoms composition, xB, or light-key mole fraction remaining in the bottoms (must be less than zF [{z_feed:.4f}] and greater than 0): ",
+        lambda value: (
+            None
+            if 0.0 < value < 1.0 and value < z_feed
+            else f"xB must be less than zF ({z_feed:.4f}) and greater than 0."
+        ),
+    )
 
-    # Basic physical consistency checks before solving.
-    if alpha <= 1.0:
-        raise ValueError("Relative volatility must be greater than 1.")
-    if not (0.0 < x_bottoms < z_feed < x_distillate < 1.0):
-        raise ValueError("Compositions must satisfy 0 < xB < zF < xD < 1.")
-    if not math.isfinite(q_value):
-        raise ValueError("q must be a finite number.")
+    q_max: float | None
+    try:
+        q_max = maximum_q_for_nonnegative_rmin(alpha, z_feed, x_distillate)
+        print(f"Maximum q for a nonnegative minimum reflux ratio: q_max = {q_max:.4f}")
+    except ValueError:
+        q_max = None
+        print("Maximum q for a nonnegative minimum reflux ratio could not be determined as a finite value.")
 
-    r_min = minimum_reflux_ratio_with_q(alpha, z_feed, x_distillate, q_value)
+    while True:
+        if q_max is not None:
+            q_value = prompt_float_with_validation(
+                f"Feed thermal condition, q (1 = saturated liquid, must be finite and <= q_max [{q_max:.4f}]): ",
+                lambda value: (
+                    None
+                    if math.isfinite(value) and value <= q_max
+                    else f"q must be finite and less than or equal to q_max ({q_max:.4f})."
+                ),
+            )
+        else:
+            q_value = prompt_float_with_validation(
+                "Feed thermal condition, q (1 = saturated liquid, must be finite): ",
+                lambda value: None if math.isfinite(value) else "q must be a finite number.",
+            )
+
+        try:
+            r_min = minimum_reflux_ratio_with_q(alpha, z_feed, x_distillate, q_value)
+            break
+        except ValueError as exc:
+            print(f"Invalid q value: {exc}")
+
     # Reflux ratio controls how much condensed distillate is returned to the column.
     if r_min >= 0.0:
         print(f"Minimum reflux ratio for these conditions: Rmin = {r_min:.4f}")
-        reflux_ratio = get_float(
-            f"Reflux ratio, R, or liquid returned to the top divided by distillate withdrawn (must be > {r_min:.4f}): "
+        reflux_ratio = prompt_float_with_validation(
+            f"Reflux ratio, R, or liquid returned to the top divided by distillate withdrawn (must be finite, > 0, and > Rmin [{r_min:.4f}]): ",
+            lambda value: (
+                None
+                if math.isfinite(value) and value > 0.0 and value > r_min
+                else f"R must be finite, greater than 0, and greater than Rmin ({r_min:.4f})."
+            ),
         )
     else:
-        reflux_ratio = get_float(
-            "Reflux ratio, R, or liquid returned to the top divided by distillate withdrawn: "
+        reflux_ratio = prompt_float_with_validation(
+            "Reflux ratio, R, or liquid returned to the top divided by distillate withdrawn (must be finite and greater than 0): ",
+            lambda value: None if math.isfinite(value) and value > 0.0 else "R must be finite and greater than 0.",
         )
-
-    if reflux_ratio < 0.0 or not math.isfinite(reflux_ratio):
-        raise ValueError("Reflux ratio must be a finite positive number.")
-    if reflux_ratio <= r_min:
-        raise ValueError(f"Reflux ratio must be greater than the minimum reflux ratio ({r_min:.3f}).")
 
     # Compute the staircase, report the theoretical stage count, then plot the result.
     stage_count, steps, x_intersection, y_intersection = calculate_stages(
