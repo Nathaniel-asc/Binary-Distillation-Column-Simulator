@@ -124,10 +124,6 @@ def minimum_reflux_ratio_with_q(alpha: float, z_feed: float, x_distillate: float
     # Minimum reflux is defined by the rectifying line through (xD, xD) and the feed pinch point.
     x_pinch, y_pinch = feed_pinch_point(alpha, z_feed, q_value)
     r_min_slope = (y_pinch - x_distillate) / (x_pinch - x_distillate)
-    if not 0.0 <= r_min_slope < 1.0:
-        raise ValueError(
-            "The selected feed condition does not give a physically valid nonnegative minimum reflux ratio."
-        )
     return r_min_slope / (1.0 - r_min_slope)
 
 
@@ -333,29 +329,11 @@ def main():
         ),
     )
 
-    q_max: float | None
-    try:
-        q_max = maximum_q_for_nonnegative_rmin(alpha, z_feed, x_distillate)
-        print(f"Maximum q for a nonnegative minimum reflux ratio: q_max = {q_max:.4f}")
-    except ValueError:
-        q_max = None
-        print("Maximum q for a nonnegative minimum reflux ratio could not be determined as a finite value.")
-
     while True:
-        if q_max is not None:
-            q_value = prompt_float_with_validation(
-                f"Feed thermal condition, q (1 = saturated liquid, must be finite and <= q_max [{q_max:.4f}]): ",
-                lambda value: (
-                    None
-                    if math.isfinite(value) and value <= q_max
-                    else f"q must be finite and less than or equal to q_max ({q_max:.4f})."
-                ),
-            )
-        else:
-            q_value = prompt_float_with_validation(
-                "Feed thermal condition, q (1 = saturated liquid, must be finite): ",
-                lambda value: None if math.isfinite(value) else "q must be a finite number.",
-            )
+        q_value = prompt_float_with_validation(
+            "Feed thermal condition, q (1 = saturated liquid, must be finite): ",
+            lambda value: None if math.isfinite(value) else "q must be a finite number.",
+        )
 
         try:
             r_min = minimum_reflux_ratio_with_q(alpha, z_feed, x_distillate, q_value)
@@ -363,21 +341,27 @@ def main():
         except ValueError as exc:
             print(f"Invalid q value: {exc}")
 
+    if r_min < 0.0:
+        print(
+            f"Warning: the minimum reflux ratio for these conditions is below 0 (Rmin = {r_min:.4f}). "
+            "Continuing with a nonnegative reflux ratio requirement."
+        )
+
     # Reflux ratio controls how much condensed distillate is returned to the column.
-    if r_min >= 0.0:
-        print(f"Minimum reflux ratio for these conditions: Rmin = {r_min:.4f}")
+    print(f"Minimum reflux ratio for these conditions: Rmin = {r_min:.4f}")
+    if r_min < 0.0:
         reflux_ratio = prompt_float_with_validation(
-            f"Reflux ratio, R, or liquid returned to the top divided by distillate withdrawn (must be finite, > 0, and > Rmin [{r_min:.4f}]): ",
-            lambda value: (
-                None
-                if math.isfinite(value) and value > 0.0 and value > r_min
-                else f"R must be finite, greater than 0, and greater than Rmin ({r_min:.4f})."
-            ),
+            "Reflux ratio, R, or liquid returned to the top divided by distillate withdrawn (must be finite and greater than or equal to 0): ",
+            lambda value: None if math.isfinite(value) and value >= 0.0 else "R must be finite and greater than or equal to 0.",
         )
     else:
         reflux_ratio = prompt_float_with_validation(
-            "Reflux ratio, R, or liquid returned to the top divided by distillate withdrawn (must be finite and greater than 0): ",
-            lambda value: None if math.isfinite(value) and value > 0.0 else "R must be finite and greater than 0.",
+            f"Reflux ratio, R, or liquid returned to the top divided by distillate withdrawn (must be finite and greater than {r_min:.4f}): ",
+            lambda value: (
+                None
+                if math.isfinite(value) and value > r_min
+                else f"R must be finite and greater than {r_min:.4f}."
+            ),
         )
 
     # Compute the staircase, report the theoretical stage count, then plot the result.
