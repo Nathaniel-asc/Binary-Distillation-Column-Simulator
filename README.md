@@ -4,13 +4,13 @@ A small Python program that uses the McCabe–Thiele method to estimate theoreti
 
 ## Assumptions
 - Constant relative volatility
-- Saturated-liquid feed (`q = 1`)
 
 ## Inputs
 - Relative volatility
 - Feed composition
 - Distillate purity
 - Bottoms purity
+- Thermal condition of the feed stream
 - Reflux ratio
 
 ## Run
