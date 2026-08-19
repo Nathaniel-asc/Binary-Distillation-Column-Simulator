@@ -156,15 +156,15 @@ def prompt_float_with_validation(prompt: str, validator: Callable[[float], str |
         print(f"Invalid value: {error_message}")
 
 
-def prompt_zero_one(prompt: str) -> bool:
-    """Prompt for 0/1 and return True for 1."""
+def prompt_one_two(prompt: str) -> bool:
+    """Prompt for 1/2 and return True for 2."""
     while True:
         response = input(prompt).strip()
-        if response == "1":
+        if response == "2":
             return True
-        if response == "0":
+        if response == "1":
             return False
-        print("Please enter 0 or 1.")
+        print("Please enter 1 or 2.")
 
 
 def separation_bounds_for_feed(vle: VLEModel, z_feed: float) -> tuple[float, float]:
@@ -416,14 +416,14 @@ def plot_mccabe_thiele(
 ):
     fig, ax = plt.subplots(figsize=(8, 8))
     if color_blind_mode:
-        # Distinct patterns keep the plot readable without relying on color.
+        # Okabe-Ito colours plus distinct patterns keep the plot readable without relying on colour alone.
         line_styles = {
-            "equilibrium": {"color": "black", "linestyle": "-"},
-            "reference": {"color": "black", "linestyle": "--"},
-            "rectifying": {"color": "black", "linestyle": "-."},
-            "stripping": {"color": "black", "linestyle": ":"},
-            "feed": {"color": "black", "linestyle": (0, (5, 2, 1, 2))},
-            "stages": {"color": "black", "linestyle": (0, (1, 1))},
+            "equilibrium": {"color": "#000000", "linestyle": "-"},
+            "reference": {"color": "#999999", "linestyle": "--"},
+            "rectifying": {"color": "#0072B2", "linestyle": "-."},
+            "stripping": {"color": "#D55E00", "linestyle": ":"},
+            "feed": {"color": "#CC79A7", "linestyle": (0, (7, 2, 1, 2)), "linewidth": 2.0},
+            "stages": {"color": "#009E73", "linestyle": (0, (1, 1))},
         }
     else:
         line_styles = {
@@ -486,8 +486,8 @@ def main():
     print("McCabe–Thiele Binary Distillation Stage Estimator")
     print("This program estimates the number of theoretical stages for a binary distillation column.")
     print("Enter all compositions as mole fractions between 0 and 1.")
-    color_blind_mode = prompt_zero_one(
-        "Colour-blind-friendly plot with distinct line patterns (0 = no, 1 = yes): "
+    color_blind_mode = prompt_one_two(
+        "Plot style (1 = standard, 2 = colour-blind-friendly with distinct line patterns): "
     )
     # The user can either generate VLE from constant relative volatility or provide measured/tabulated data.
     while True:
