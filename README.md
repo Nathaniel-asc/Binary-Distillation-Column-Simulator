@@ -4,9 +4,12 @@ A small Python program that uses the McCabe–Thiele method to estimate theoreti
 
 ## Assumptions
 - Constant relative volatility
+- Constant Molar Overflow (CMO)
+- Negligible heat effects
+- Isobaric operation
 
 ## Inputs
-- Relative volatility
+- Relative volatility or VLE data
 - Feed composition
 - Distillate purity
 - Bottoms purity
