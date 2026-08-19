@@ -45,3 +45,58 @@ The reported value is rounded up to a whole number of theoretical stages when th
 pip install -r requirements.txt
 python simulator.py
 ```
+
+## Reproducible example
+
+The following inputs use the constant-relative-volatility model and reproduce the
+plot below:
+
+```text
+alpha = 2.4
+zF    = 0.40
+xD    = 0.90
+xB    = 0.10
+q     = 1.0
+R     = 1.5
+```
+
+For these values, the calculated minimum reflux ratio is `Rmin = 1.3214`, so
+`R = 1.5` is valid. The simulator estimates **14 theoretical stages**. The
+total condenser is not counted, and a partially traversed final reboiler is
+counted as one whole stage.
+
+![McCabe–Thiele plot for the reproducible example](docs/mccabe-thiele-example.png)
+
+The example can be reproduced interactively with `python simulator.py` by
+selecting relative volatility and entering the values above.
+
+## Model assumptions and limitations
+
+The simulator applies the McCabe–Thiele method under these assumptions:
+
+- Binary mixture with a designated light key and heavy key.
+- Constant molar overflow (constant liquid and vapor molar flow rates in each
+  column section).
+- Isobaric operation with negligible heat losses and heat effects.
+- Each theoretical stage reaches vapor–liquid equilibrium.
+- A total condenser is used and is not counted as an equilibrium stage; the
+  reboiler is included in the reported stage count.
+- For the constant-volatility option, relative volatility is constant across
+  the column. CSV VLE data are treated as piecewise-linear equilibrium data.
+
+Results are estimates rather than a detailed process design. The model does
+not account for tray or packing efficiency, pressure drop, hydraulic limits,
+entrainment, weeping, flooding, heat-integration requirements, condenser or
+reboiler sizing, energy balances, or multicomponent effects. Real mixtures
+with strongly temperature-dependent volatility or significant non-ideal
+behavior should use measured or thermodynamic VLE data and independently
+validate the predicted separation. Azeotropes cannot be crossed by ordinary
+binary distillation in this calculation.
+
+## Tests
+
+Install the dependencies and run the automated test suite with:
+
+```bash
+python -m pytest
+```
