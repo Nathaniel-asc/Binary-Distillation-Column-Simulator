@@ -21,9 +21,17 @@ x,y
 ```
 
 See `example_vle_data.csv` for a regular VLE curve and `example_azeotropic_vle_data.csv` for a curve with an azeotrope at `x = y = 0.5`.
+- Constant Molar Overflow (CMO)
+- Negligible heat effects
+- Isobaric operation
+
+## Assumptions
+- Constant Molar Overflow (CMO)
+- Negligible heat effects
+- Isobaric operation
 
 ## Inputs
-- Relative volatility or a VLE CSV file
+- Relative volatility or VLE data
 - Feed composition
 - Distillate purity
 - Bottoms purity
